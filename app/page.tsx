@@ -38,7 +38,6 @@ export default function App() {
   const [newTopicName, setNewTopicName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { user, signOut } = useAuthenticator();
-
   function listTodos() {
     client.models.Todo.observeQuery().subscribe({
       next: (data) => {
@@ -624,6 +623,7 @@ export default function App() {
           </div>
         </div>
       )}
+      <button onClick={signOut}>Sign out</button>
     </div>
   );
 }
