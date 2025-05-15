@@ -176,17 +176,32 @@ export default function App() {
     setIsEditModalOpen(true);
   };
 
-  // Update functionality
-  const updateTodo = () => {
-    if (currentTodo && editContent.trim()) {
-      // Store topic and description in content field
-      const updatedContent = `${editContent}|:|${selectedTopic}|:|${editDescription}`;
-      client.models.Todo.update({
+  const updateTodo = async () => {
+  if (currentTodo && editContent.trim()) {
+    // Store topic and description in content field
+    const updatedContent = `${editContent}|:|${selectedTopic}|:|${editDescription}`;
+
+    try {
+      // 1. Update the task
+      await client.models.Todo.update({
         id: currentTodo.id,
-        content: updatedContent
+        content: updatedContent,
       });
 
-      // If the edited todo was selected, update the selected todo
+      // 2. Notify backend (SNS → Email)
+      const userEmail = user.signInDetails?.loginId;
+      await fetch("https://oe0vmgmtw9.execute-api.eu-north-1.amazonaws.com/dev/notify", { //the api gatway url
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          taskId: currentTodo.id,
+          userEmail: userEmail,
+        }),
+      });
+
+      // 3. Update selectedTodo in frontend 
       if (selectedTodo && selectedTodo.id === currentTodo.id) {
         setSelectedTodo({
           ...currentTodo,
@@ -197,9 +212,12 @@ export default function App() {
       }
 
       setIsEditModalOpen(false);
+    } catch (error) {
+      console.error("Failed to update or notify:", error);
+      alert("Failed to update task or send notification.");
     }
-  };
-
+  }
+};
   // Open delete modal
   const openDeleteModal = (todo: ExtendedTodo) => {
     setCurrentTodo(todo);
