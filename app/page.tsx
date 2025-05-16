@@ -178,11 +178,9 @@ export default function App() {
 
   const updateTodo = async () => {
   if (currentTodo && editContent.trim()) {
-    // Store topic and description in content field
     const updatedContent = `${editContent}|:|${selectedTopic}|:|${editDescription}`;
 
     try {
-      // 1. Update the task
       await client.models.Todo.update({
         id: currentTodo.id,
         content: updatedContent,
@@ -190,13 +188,18 @@ export default function App() {
 
       // 2. Notify backend (SNS → Email)
       const userEmail = user.signInDetails?.loginId;
-      await fetch("https://oe0vmgmtw9.execute-api.eu-north-1.amazonaws.com/dev/notify", { //the api gatway url
+
+      const taskTitle = editContent;
+
+      await fetch("https://oe0vmgmtw9.execute-api.eu-north-1.amazonaws.com/dev/notify", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           taskId: currentTodo.id,
+          taskTitle: taskTitle,
+          updatedContent: updatedContent,
           userEmail: userEmail,
         }),
       });
@@ -218,6 +221,8 @@ export default function App() {
     }
   }
 };
+
+
   // Open delete modal
   const openDeleteModal = (todo: ExtendedTodo) => {
     setCurrentTodo(todo);
