@@ -39,6 +39,7 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { user, signOut } = useAuthenticator();
   const [isDetachFileOpen, setIsDetachFileOpen] = useState(false);
+  const [isAddingTask, setIsAddingTask] = useState(false);
 
   function listTodos() {
     sharedClient.models.Todo.observeQuery().subscribe({
@@ -88,15 +89,19 @@ export default function App() {
       alert('Please enter a task title');
       return;
     }
+    setIsAddingTask(true);
     try {
       await createTodo(newTodo, selectedTopic, newTodoDescription, selectedFile);
       // Reset form
+      listTodos();
       setNewTodo("");
       setNewTodoDescription("");
       setSelectedFile(null);
     } catch (error) {
       console.error('Error creating task:', error);
       alert('Failed to create task. Please try again.');
+    } finally {
+      setIsAddingTask(false);
     }
   };
 
@@ -128,7 +133,7 @@ export default function App() {
   const handelUpdateTodo = async () => {
     if (selectedTodo && editContent.trim()) {
       try {
-
+        setIsAddingTask(true);
         const updatedTodo = await updateTodo(selectedTodo.id, editContent, selectedTopic, editDescription, editFile, selectedFile);
         // Update the selected todo in local state
         setSelectedTodo({
@@ -142,6 +147,8 @@ export default function App() {
       } catch (error) {
         console.error('Error updating task:', error);
         alert('Failed to update task. Please try again.');
+      } finally {
+        setIsAddingTask(false);
       }
     }
   };
@@ -150,6 +157,7 @@ export default function App() {
   const handelDeleteTodo = async () => {
     if (selectedTodo) {
       await deleteTodo(selectedTodo.id, selectedTodo.fileUrl);
+      listTodos();
       setSelectedTodo(null);
       setIsDeleteModalOpen(false);
     }
@@ -187,7 +195,7 @@ export default function App() {
     try {
       if (selectedTodo && await deletefile(selectedTodo.fileUrl)) {
         // @ts-ignore
-        updateTodo(selectedTodo.id, selectedTodo.content, selectedTodo.topic, selectedTodo.description, "",null);
+        updateTodo(selectedTodo.id, selectedTodo.content, selectedTodo.topic, selectedTodo.description, "", null);
         setSelectedTodo({
           ...selectedTodo,
           fileUrl: ""
@@ -324,8 +332,12 @@ export default function App() {
               >
                 {selectedFile ? 'Detach File' : 'Attach File'}
               </label>
-              <button onClick={handelCreateTodo} className="btn-primary">
-                Add Task
+              <button
+                onClick={handelCreateTodo}
+                className={`btn-primary ${isAddingTask ? 'loading' : ''}`}
+                disabled={isAddingTask}
+              >
+                {isAddingTask ? 'Adding...' : 'Add Task'}
               </button>
             </div>
           </div>
@@ -567,7 +579,9 @@ export default function App() {
               <button className="btn-secondary" onClick={closeModals}>
                 Cancel
               </button>
-              <button className="btn-primary" onClick={handelUpdateTodo}>
+              <button className={`btn-primary ${isAddingTask ? 'loading' : ''}`}
+                disabled={isAddingTask}
+                onClick={handelUpdateTodo}>
                 Save Changes
               </button>
             </div>
