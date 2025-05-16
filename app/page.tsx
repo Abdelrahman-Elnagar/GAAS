@@ -127,44 +127,52 @@ export default function App() {
     setSelectedFile(null);
     setIsEditModalOpen(true);
   };
+  
+    const updateTodo = async () => {
+  if (currentTodo && editContent.trim()) {
+    const updatedContent = `${editContent}|:|${selectedTopic}|:|${editDescription}`;
 
-  // Update functionality
-  // Update functionality
-  const handelUpdateTodo = async () => {
-    if (selectedTodo && editContent.trim()) {
-      try {
-        setIsAddingTask(true);
-        const updatedTodo = await updateTodo(selectedTodo.id, editContent, selectedTopic, editDescription, editFile, selectedFile);
-        
+    try {
+      await client.models.Todo.update({
+        id: currentTodo.id,
+        content: updatedContent,
+      });
+
+      // 2. Notify backend (SNS → Email)
+      const userEmail = user.signInDetails?.loginId;
+
+      const taskTitle = editContent;
+
+      await fetch("https://oe0vmgmtw9.execute-api.eu-north-1.amazonaws.com/dev/notify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          taskId: currentTodo.id,
+          taskTitle: taskTitle,
+          updatedContent: updatedContent,
+          userEmail: userEmail,
+        }),
+      });
+
+      // 3. Update selectedTodo in frontend 
+      if (selectedTodo && selectedTodo.id === currentTodo.id) {
         setSelectedTodo({
-          ...selectedTodo,
-          ...updatedTodo
+          ...currentTodo,
+          content: editContent,
+          topic: selectedTopic,
+          description: editDescription
         });
-
-        listTodos();
-        setSelectedFile(null);
-        const userEmail = user.signInDetails?.loginId;
-        await fetch("https://oe0vmgmtw9.execute-api.eu-north-1.amazonaws.com/dev/notify", { //the api gatway url
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            taskId: selectedTodo.id,
-            userEmail: userEmail,
-          }),
-        });
-        // Update the selected todo in local state
-      } catch (error) {
-        console.error("Failed to update or notify:", error);
-        alert("Failed to update task or send notification.");
-      } finally {
-        setIsAddingTask(false);
       }
 
       setIsEditModalOpen(false);
+    } catch (error) {
+      console.error("Failed to update or notify:", error);
+      alert("Failed to update task or send notification.");
     }
-  };
+  }
+};
 
   // Delete functionality
   const handelDeleteTodo = async () => {
@@ -594,7 +602,7 @@ export default function App() {
               </button>
               <button className={`btn-primary ${isAddingTask ? 'loading' : ''}`}
                 disabled={isAddingTask}
-                onClick={handelUpdateTodo}>
+                onClick={updateTodo}>
                 Save Changes
               </button>
             </div>
