@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
 import "./../app/app.css";
 import { Amplify } from "aws-amplify";
@@ -13,6 +14,7 @@ import { sharedClient } from "@/amplify/shared/client";
 import { createTodo, deleteTodo, updateTodo } from "@/amplify/custom/todo/resource";
 
 Amplify.configure(outputs);
+const client = generateClient<Schema>();
 
 // Extended type for Todo with topic
 type ExtendedTodo = Schema["Todo"]["type"] & {
