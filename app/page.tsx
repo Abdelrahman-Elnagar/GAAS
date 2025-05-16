@@ -135,7 +135,7 @@ export default function App() {
       try {
         setIsAddingTask(true);
         const updatedTodo = await updateTodo(selectedTodo.id, editContent, selectedTopic, editDescription, editFile, selectedFile);
-        // Update the selected todo in local state
+        
         setSelectedTodo({
           ...selectedTodo,
           ...updatedTodo
@@ -143,13 +143,26 @@ export default function App() {
 
         listTodos();
         setSelectedFile(null);
-        setIsEditModalOpen(false);
+        const userEmail = user.signInDetails?.loginId;
+        await fetch("https://oe0vmgmtw9.execute-api.eu-north-1.amazonaws.com/dev/notify", { //the api gatway url
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            taskId: selectedTodo.id,
+            userEmail: userEmail,
+          }),
+        });
+        // Update the selected todo in local state
       } catch (error) {
-        console.error('Error updating task:', error);
-        alert('Failed to update task. Please try again.');
+        console.error("Failed to update or notify:", error);
+        alert("Failed to update task or send notification.");
       } finally {
         setIsAddingTask(false);
       }
+
+      setIsEditModalOpen(false);
     }
   };
 
