@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
 import "./../app/app.css";
 import { Amplify } from "aws-amplify";
@@ -9,10 +8,11 @@ import outputs from "@/amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
 import '@aws-amplify/ui-react/styles.css'
 import { useAuthenticator } from "@aws-amplify/ui-react";
-import { uploadData } from "aws-amplify/storage";
-Amplify.configure(outputs);
+import { createFile, deletefile, goToFile } from "@/amplify/custom/file/resource";
+import { sharedClient } from "@/amplify/shared/client";
+import { createTodo, deleteTodo, updateTodo } from "@/amplify/custom/todo/resource";
 
-const client = generateClient<Schema>();
+Amplify.configure(outputs);
 
 // Extended type for Todo with topic
 type ExtendedTodo = Schema["Todo"]["type"] & {
@@ -28,8 +28,8 @@ export default function App() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isNewTopicModalOpen, setIsNewTopicModalOpen] = useState(false);
-  const [currentTodo, setCurrentTodo] = useState<ExtendedTodo | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [editFile, setEditFile] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [selectedTodo, setSelectedTodo] = useState<ExtendedTodo | null>(null);
   const [expandedTopic, setExpandedTopic] = useState<string | null>(null);
@@ -38,9 +38,10 @@ export default function App() {
   const [newTopicName, setNewTopicName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { user, signOut } = useAuthenticator();
+  const [isDetachFileOpen, setIsDetachFileOpen] = useState(false);
 
   function listTodos() {
-    client.models.Todo.observeQuery().subscribe({
+    sharedClient.models.Todo.observeQuery().subscribe({
       next: (data) => {
         // Convert the data to our extended type with topic field
         const extendedData = data.items.map(item => {
@@ -48,15 +49,14 @@ export default function App() {
           // This is a temporary solution until we update the schema
           // In a real app, you'd update your schema to include topic field
           const todoItem = item as ExtendedTodo;
-          if (!todoItem.topic) {
-            todoItem.topic = "Personal"; // Default topic
-          }
-          if (!todoItem.description) {
-            todoItem.description = ""; // Default empty description
-          }
-          if (!todoItem.fileUrl) {
-            todoItem.fileUrl = ""; // Default empty file URL
-          }
+          const content = todoItem.content || "";
+          const parts = content.split("|:|");
+
+          todoItem.content = parts[0] || "",
+            todoItem.topic = parts[1] || "Personal",
+            todoItem.description = parts[2] || "",
+            todoItem.fileUrl = parts[3] || ""
+
           return todoItem;
         });
         setTodos([...extendedData]);
@@ -83,47 +83,13 @@ export default function App() {
 
   const topicCounts = getTopicsWithCounts();
 
-  // Create functionality
-  const createTodo = () => {
-    if (newTodo.trim()) {
-      // In a real app, you'd update your schema to include topic
-      // For now, we'll store it in the content field with a special prefix
-      client.models.Todo.create({
-        content: `${newTodo}|:|${selectedTopic}|:|${newTodoDescription}`
-      });
-      setNewTodo("");
-      setNewTodoDescription("");
-    }
-  };
-
-  const handleCreateWithFile = async () => {
+  const handelCreateTodo = async () => {
     if (!newTodo.trim()) {
       alert('Please enter a task title');
       return;
     }
-
     try {
-      let fileUrl = '';
-      if (selectedFile) {
-        const result = await uploadData({
-          path: `files/${selectedFile.name}`,
-          data: selectedFile,
-          options: {
-            // Specify a target bucket using name assigned in Amplify Backend
-            bucket: {
-              bucketName:'amplify-d2a1qc3q0pxa7d-de-gaasstoragebucket84ca08f-hw5ds4l9qiuh',
-              region: 'eu-north-1'
-            }
-          }
-        }).result;
-        fileUrl = result.path;
-      }
-
-      // Create todo with file attachment
-      await client.models.Todo.create({
-        content: `${newTodo}|:|${selectedTopic}|:|${newTodoDescription}|:|${fileUrl}`
-      });
-
+      await createTodo(newTodo, selectedTopic, newTodoDescription, selectedFile);
       // Reset form
       setNewTodo("");
       setNewTodoDescription("");
@@ -141,82 +107,50 @@ export default function App() {
       setSelectedFile(file);
     }
   };
-  // Process content field to extract topic and description
-  const processTodoContent = (todo: Schema["Todo"]["type"]): ExtendedTodo => {
-    const content = todo.content || "";
-    const parts = content.split("|:|");
-
-    return {
-      ...todo,
-      content: parts[0] || "",
-      topic: parts[1] || "Personal",
-      description: parts[2] || "",
-      fileUrl: parts[3] || ""
-    };
-  };
-
-  // Process todos to display with topics
-  const processTodos = () => {
-    return todos.map(processTodoContent);
-  };
-
-  const processedTodos = processTodos();
 
   // Get todos for a specific topic
   const getTodosByTopic = (topic: string) => {
-    return processedTodos.filter(todo => todo.topic === topic);
+    return todos.filter(todo => todo.topic === topic);
   };
 
   // Open edit modal
   const openEditModal = (todo: ExtendedTodo) => {
-    const processedTodo = processTodoContent(todo);
-    setCurrentTodo(processedTodo);
-    setEditContent(processedTodo.content || "");
-    setEditDescription(processedTodo.description || "");
-    setSelectedTopic(processedTodo.topic || "Personal");
+    setEditContent(todo.content || "");
+    setEditDescription(todo.description || "");
+    setSelectedTopic(todo.topic || "Personal");
+    setEditFile(todo.fileUrl || "")
+    setSelectedFile(null);
     setIsEditModalOpen(true);
   };
 
   // Update functionality
-  const updateTodo = () => {
-    if (currentTodo && editContent.trim()) {
-      // Store topic and description in content field
-      const updatedContent = `${editContent}|:|${selectedTopic}|:|${editDescription}`;
-      client.models.Todo.update({
-        id: currentTodo.id,
-        content: updatedContent
-      });
+  // Update functionality
+  const handelUpdateTodo = async () => {
+    if (selectedTodo && editContent.trim()) {
+      try {
 
-      // If the edited todo was selected, update the selected todo
-      if (selectedTodo && selectedTodo.id === currentTodo.id) {
+        const updatedTodo = await updateTodo(selectedTodo.id, editContent, selectedTopic, editDescription, editFile, selectedFile);
+        // Update the selected todo in local state
         setSelectedTodo({
-          ...currentTodo,
-          content: editContent,
-          topic: selectedTopic,
-          description: editDescription
+          ...selectedTodo,
+          ...updatedTodo
         });
-      }
 
-      setIsEditModalOpen(false);
+        listTodos();
+        setSelectedFile(null);
+        setIsEditModalOpen(false);
+      } catch (error) {
+        console.error('Error updating task:', error);
+        alert('Failed to update task. Please try again.');
+      }
     }
   };
 
-  // Open delete modal
-  const openDeleteModal = (todo: ExtendedTodo) => {
-    setCurrentTodo(todo);
-    setIsDeleteModalOpen(true);
-  };
-
   // Delete functionality
-  const deleteTodo = () => {
-    if (currentTodo) {
-      client.models.Todo.delete({ id: currentTodo.id });
-
-      // If the deleted todo was selected, clear selection
-      if (selectedTodo && selectedTodo.id === currentTodo.id) {
-        setSelectedTodo(null);
-      }
-
+  const handelDeleteTodo = async () => {
+    if (selectedTodo) {
+      await deleteTodo(selectedTodo.id, selectedTodo.fileUrl);
+      setSelectedTodo(null);
       setIsDeleteModalOpen(false);
     }
   };
@@ -228,12 +162,6 @@ export default function App() {
     } else {
       setExpandedTopic(topic);
     }
-  };
-
-  // Select a todo to view details
-  const selectTodo = (todo: ExtendedTodo) => {
-    const processedTodo = processTodoContent(todo);
-    setSelectedTodo(processedTodo);
   };
 
   // Add new topic
@@ -248,10 +176,31 @@ export default function App() {
 
   // Close modals
   const closeModals = () => {
+    setSelectedFile(null);
     setIsEditModalOpen(false);
     setIsDeleteModalOpen(false);
+    setIsDetachFileOpen(false);
     setIsNewTopicModalOpen(false);
   };
+
+  const detachFile = async () => {
+    try {
+      if (selectedTodo && await deletefile(selectedTodo.fileUrl)) {
+        // @ts-ignore
+        updateTodo(selectedTodo.id, selectedTodo.content, selectedTodo.topic, selectedTodo.description, "",null);
+        setSelectedTodo({
+          ...selectedTodo,
+          fileUrl: ""
+        });
+        listTodos();
+        setEditFile("")
+        closeModals();
+      }
+    } catch (error) {
+      console.error(error)
+    }
+    setIsDetachFileOpen(false);
+  }
 
   return (
     <div className="app-container">
@@ -295,7 +244,7 @@ export default function App() {
                       className={`topic-todo-item ${selectedTodo?.id === todo.id ? 'selected' : ''}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        selectTodo(todo);
+                        setSelectedTodo(todo);
                       }}
                     >
                       {todo.content}
@@ -322,7 +271,7 @@ export default function App() {
                 onChange={(e) => setNewTodo(e.target.value)}
                 placeholder="New task title..."
                 className="input"
-                onKeyPress={(e) => e.key === "Enter" && handleCreateWithFile()}
+                onKeyPress={(e) => e.key === "Enter" && handelCreateTodo()}
               />
               <select
                 className="select"
@@ -347,6 +296,8 @@ export default function App() {
                 onChange={handleFileSelect}
                 style={{ display: 'none' }}
                 id="file-upload"
+                // Add key to force input re-render when file is detached
+                key={selectedFile ? "hasFile" : "noFile"}
               />
               <span className="file-name">
                 {selectedFile && 'File selected: '}
@@ -363,13 +314,17 @@ export default function App() {
                   'No file selected'
                 )}
               </span>
-              <label htmlFor="file-upload" className="btn-primary" onClick={selectedFile ? (e) => {
-                e.preventDefault();
-                setSelectedFile(null);
-              } : undefined}>
+              <label
+                htmlFor="file-upload"
+                className="btn-primary"
+                onClick={selectedFile ? (e) => {
+                  e.preventDefault();
+                  setSelectedFile(null);
+                } : undefined}
+              >
                 {selectedFile ? 'Detach File' : 'Attach File'}
               </label>
-              <button onClick={handleCreateWithFile} className="btn-primary">
+              <button onClick={handelCreateTodo} className="btn-primary">
                 Add Task
               </button>
             </div>
@@ -389,13 +344,26 @@ export default function App() {
                   <li
                     key={todo.id}
                     className={`todo-item ${selectedTodo?.id === todo.id ? 'selected' : ''}`}
-                    onClick={() => selectTodo(todo)}
+                    onClick={() => setSelectedTodo(todo)}
                   >
                     <span className="todo-content">{todo.content}</span>
                     <div className="todo-actions">
+                      {todo.fileUrl && (
+                        <button onClick={() => goToFile(todo.fileUrl)}
+                          className="btn-icon"
+                          aria-label="Download file"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                          </svg>
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setSelectedTodo(todo);
                           openEditModal(todo);
                         }}
                         className="btn-icon"
@@ -408,7 +376,8 @@ export default function App() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openDeleteModal(todo);
+                          setSelectedTodo(todo)
+                          setIsDeleteModalOpen(true);
                         }}
                         className="btn-icon-destructive"
                         aria-label="Delete todo"
@@ -464,6 +433,18 @@ export default function App() {
                   <p className="empty-description">No description provided</p>
                 )}
               </div>
+              <div className="details-description">
+                <h4>Attached File</h4>
+                {selectedTodo.fileUrl ? (
+                  <a
+                    onClick={() => goToFile(selectedTodo.fileUrl)}
+                    rel="noopener noreferrer"
+                    className="file-link"
+                  >{selectedTodo.fileUrl.substring(6)}</a>
+                ) : (
+                  <p className="empty-description">No Attached File</p>
+                )}
+              </div>
               <div className="details-actions">
                 <button
                   className="btn-secondary"
@@ -473,7 +454,7 @@ export default function App() {
                 </button>
                 <button
                   className="btn-destructive"
-                  onClick={() => openDeleteModal(selectedTodo)}
+                  onClick={() => setIsDeleteModalOpen(true)}
                 >
                   Delete Task
                 </button>
@@ -533,6 +514,45 @@ export default function App() {
                 </select>
               </div>
               <div className="form-group">
+                <label htmlFor="edit-file">File</label>
+                {editFile === "" ? (
+                  <div className="file-input-wrapper">
+                    <input
+                      type="file"
+                      onChange={handleFileSelect}
+                      style={{ display: 'none' }}
+                      id="file-upload"
+                    />
+
+                    <label htmlFor="file-upload" className="file_upload" onClick={selectedFile ? (e) => {
+                      e.preventDefault();
+                      setSelectedFile(null);
+                    } : undefined}>
+                      {selectedFile ? 'Detach File' : 'Attach File'}
+                    </label>
+                    <span className="file-name">
+                      {selectedFile && 'File selected: '}
+                      {selectedFile ? (
+                        <a
+                          href={URL.createObjectURL(selectedFile) || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="file-link"
+                        >
+                          {selectedFile.name}
+                        </a>
+                      ) : (
+                        'No file selected'
+                      )}
+                    </span>
+                  </div>
+                ) : (
+                  <button onClick={() => setIsDetachFileOpen(true)} className="file_upload">
+                    Detach Uploaded File
+                  </button>
+                )}
+              </div>
+              <div className="form-group">
                 <label htmlFor="edit-description">Description</label>
                 <textarea
                   id="edit-description"
@@ -547,7 +567,7 @@ export default function App() {
               <button className="btn-secondary" onClick={closeModals}>
                 Cancel
               </button>
-              <button className="btn-primary" onClick={updateTodo}>
+              <button className="btn-primary" onClick={handelUpdateTodo}>
                 Save Changes
               </button>
             </div>
@@ -571,15 +591,44 @@ export default function App() {
             <div className="modal-body">
               <p>Are you sure you want to delete this task?</p>
               <div className="todo-preview">
-                {currentTodo?.content}
+                {selectedTodo?.content}
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={closeModals}>
                 Cancel
               </button>
-              <button className="btn-destructive" onClick={deleteTodo}>
+              <button className="btn-destructive" onClick={handelDeleteTodo}>
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* detach file */}
+      {isDetachFileOpen && (
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Detach file</h3>
+              <button className="modal-close" onClick={closeModals}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6L6 18"></path>
+                  <path d="M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to detach this file from the task?</p>
+              <p style={{ color: "red" }}>It will be lost forever</p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={closeModals}>
+                Cancel
+              </button>
+              <button className="btn-destructive" onClick={detachFile}>
+                Detach
               </button>
             </div>
           </div>
