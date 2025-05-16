@@ -28,6 +28,7 @@ export default function App() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isNewTopicModalOpen, setIsNewTopicModalOpen] = useState(false);
+  const [currentTodo, setCurrentTodo] = useState<ExtendedTodo | null>(null);
   const [editContent, setEditContent] = useState("");
   const [editFile, setEditFile] = useState("");
   const [editDescription, setEditDescription] = useState("");
