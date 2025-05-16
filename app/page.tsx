@@ -673,6 +673,7 @@ export default function App() {
           </div>
         </div>
       )}
+      <button onClick={signOut}>Sign out</button>
     </div>
   );
 }
