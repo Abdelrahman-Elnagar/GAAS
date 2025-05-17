@@ -124,6 +124,7 @@ export default function App() {
 
   // Open edit modal
   const openEditModal = (todo: ExtendedTodo) => {
+    setCurrentTodo(todo); 
     setEditContent(todo.content || "");
     setEditDescription(todo.description || "");
     setSelectedTopic(todo.topic || "Personal");
