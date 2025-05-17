@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { User, Settings, LogOut } from "lucide-react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
 import "./../app/app.css";
@@ -9,9 +10,11 @@ import outputs from "@/amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
 import '@aws-amplify/ui-react/styles.css'
 import { useAuthenticator } from "@aws-amplify/ui-react";
-import { createFile, deletefile, goToFile } from "@/amplify/custom/file/resource";
+import { deletefile, goToFile } from "@/amplify/custom/file/resource";
 import { sharedClient } from "@/amplify/shared/client";
 import { createTodo, deleteTodo, updateTodo } from "@/amplify/custom/todo/resource";
+import Image from 'next/image';
+import logo from './Public/LOGO.jpg';
 
 Amplify.configure(outputs);
 const client = generateClient<Schema>();
@@ -69,9 +72,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    console.log("Current user:", user);
     if (user) {
-      console.log("Fetching todos for user:", user.username);
       listTodos();
     }
   }, [user]);
@@ -234,11 +235,17 @@ export default function App() {
     setIsDetachFileOpen(false);
   }
 
+    // Popup System For Profile
+    const [isExpanded, setIsExpanded] = useState(false);
+    const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+    };
+
   return (
     <div className="app-container">
       <div className="sidebar">
         <div className="sidebar-header">
-          <h2>Topics</h2>
+          <h2>Categories</h2>
           <button
             className="btn-icon-small"
             onClick={() => setIsNewTopicModalOpen(true)}
@@ -268,33 +275,55 @@ export default function App() {
                 <span className="topic-name">{topic}</span>
                 <span className="topic-count">{topicCounts[topic] || 0}</span>
               </div>
-              {expandedTopic === topic && (
-                <ul className="topic-todos">
-                  {getTodosByTopic(topic).map((todo) => (
-                    <li
-                      key={todo.id}
-                      className={`topic-todo-item ${selectedTodo?.id === todo.id ? 'selected' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedTodo(todo);
-                      }}
-                    >
-                      {todo.content}
-                    </li>
-                  ))}
-                  {getTodosByTopic(topic).length === 0 && (
-                    <li className="topic-todo-empty">No tasks</li>
-                  )}
-                </ul>
-              )}
             </li>
           ))}
         </ul>
+        {/* Profile Section Left Container */}
+        <div className="profileContainer">
+            <div className="profileMain">
+                <div className="profileAvatar">
+                    <User size={20} />
+                </div>
+                <div className="profileInfo">
+                     <span className="profileName">{user.signInDetails?.loginId?.split('@')[0] || "Login Required"}</span>
+                     <span className="profileEmail">{user.signInDetails?.loginId || "Login Required"}</span>
+                </div>
+                <button className="settingsButton"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand();
+                    }}
+                >
+                    <Settings size={16} />
+                </button>
+                <button className="logoutButton"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        signOut();
+                    }}
+                >
+                    <LogOut size={16} />
+                </button>
+            </div>
+            {/* User Xtra Settings */}
+            {isExpanded && (
+                <div className="profileDropdown">
+                    <ul className="profileMenu">
+                        <li className="profileMenuItem">Profile</li>
+                        <li className="profileMenuItem">Preferences</li>
+                        <li className="profileMenuItem" onClick={signOut}>Sign out </li>
+                    </ul>
+                </div>
+            )}
+        </div>
       </div>
-
+      {/* Central Container */}
       <main className="main-content">
         <div className="header">
-          <h1 className="title">{user.signInDetails?.loginId}'s Tasks</h1>
+            <div className="CentralTitle">
+                <Image src={logo} alt="Logo" width={75} height={75} />
+                <h1 className="title">Tasks Mangment</h1>
+            </div>
           <div className="task-creation-panel">
             <div className="input-group">
               <input
@@ -711,7 +740,6 @@ export default function App() {
           </div>
         </div>
       )}
-      <button onClick={signOut}>Sign out</button>
     </div>
   );
 }
