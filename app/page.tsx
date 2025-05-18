@@ -14,7 +14,7 @@ import { deletefile, goToFile } from "@/amplify/custom/file/resource";
 import { sharedClient } from "@/amplify/shared/client";
 import { createTodo, deleteTodo, updateTodo } from "@/amplify/custom/todo/resource";
 import Image from 'next/image';
-import logo from './Public/LOGO.png';
+//import logo from './Public/LOGO.png';
 
 Amplify.configure(outputs);
 const client = generateClient<Schema>();
@@ -343,7 +343,7 @@ export default function App() {
       <main className="main-content">
         <div className="header">
           <div className="CentralTitle">
-            <Image src={logo} alt="Logo" width={75} height={75} />
+            {/*<Image src={logo} alt="Logo" width={75} height={75} />*/}
             <h1 className="title">Tasks Mangment</h1>
           </div>
           <div className="task-creation-panel">
