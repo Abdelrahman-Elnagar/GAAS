@@ -49,6 +49,7 @@ export default function App() {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [userUsername, setUsername] = useState<string>('');
   const [userPhone, setPhone] = useState<string>('');
+  const [userEmail, setEmail] = useState<string>('');
 
 
   function listTodos() {
@@ -249,9 +250,10 @@ export default function App() {
 
   const UserDetails = () => {
     // get user details
-    const user = {username: "dummy", number:"+1234567890"};  // replace with actual user data
+    const user = {username: "dummy", number:"+1234567890", email:"user@example.com"};  // replace with actual user data
     setUsername(user.username);
     setPhone(user.number);
+    setEmail(user.email)
     setIsUserModalOpen(true);
   }
 
@@ -650,6 +652,10 @@ export default function App() {
               <div className="form-group">
                 <label htmlFor="edit-phone">Phone Number</label>
                 <p>{userPhone}</p>
+              </div>
+              <div className="form-group">
+                <label htmlFor="edit-phone">Email</label>
+                <p>{userEmail}</p>
               </div>
             </div>
 
