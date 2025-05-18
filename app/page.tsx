@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { User, Settings, LogOut } from "lucide-react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
 import "./../app/app.css";
@@ -9,9 +10,11 @@ import outputs from "@/amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
 import '@aws-amplify/ui-react/styles.css'
 import { useAuthenticator } from "@aws-amplify/ui-react";
-import { createFile, deletefile, goToFile } from "@/amplify/custom/file/resource";
+import { deletefile, goToFile } from "@/amplify/custom/file/resource";
 import { sharedClient } from "@/amplify/shared/client";
 import { createTodo, deleteTodo, updateTodo } from "@/amplify/custom/todo/resource";
+import Image from 'next/image';
+//import logo from './Public/LOGO.png';
 
 Amplify.configure(outputs);
 const client = generateClient<Schema>();
@@ -28,6 +31,7 @@ export default function App() {
   const [newTodo, setNewTodo] = useState("");
   const [newTodoDescription, setNewTodoDescription] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isNewTopicModalOpen, setIsNewTopicModalOpen] = useState(false);
   const [currentTodo, setCurrentTodo] = useState<ExtendedTodo | null>(null);
@@ -43,6 +47,10 @@ export default function App() {
   const { user, signOut } = useAuthenticator();
   const [isDetachFileOpen, setIsDetachFileOpen] = useState(false);
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [userUsername, setUsername] = useState<string>('');
+  const [userPhone, setPhone] = useState<string>('');
+  const [userEmail, setEmail] = useState<string>('');
+
 
   function listTodos() {
     sharedClient.models.Todo.observeQuery().subscribe({
@@ -69,9 +77,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    console.log("Current user:", user);
     if (user) {
-      console.log("Fetching todos for user:", user.username);
       listTodos();
     }
   }, [user]);
@@ -214,6 +220,7 @@ export default function App() {
     setIsDeleteModalOpen(false);
     setIsDetachFileOpen(false);
     setIsNewTopicModalOpen(false);
+    setIsUserModalOpen(false);
   };
 
   const detachFile = async () => {
@@ -235,11 +242,26 @@ export default function App() {
     setIsDetachFileOpen(false);
   }
 
+    // Popup System For Profile
+    const [isExpanded, setIsExpanded] = useState(false);
+    const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+    };
+
+  const UserDetails = () => {
+    // get user details
+    const user = {username: "dummy", number:"+1234567890", email:"user@example.com"};  // replace with actual user data
+    setUsername(user.username);
+    setPhone(user.number);
+    setEmail(user.email)
+    setIsUserModalOpen(true);
+  }
+
   return (
     <div className="app-container">
       <div className="sidebar">
         <div className="sidebar-header">
-          <h2>Topics</h2>
+          <h2>Categories</h2>
           <button
             className="btn-icon-small"
             onClick={() => setIsNewTopicModalOpen(true)}
@@ -269,69 +291,75 @@ export default function App() {
                 <span className="topic-name">{topic}</span>
                 <span className="topic-count">{topicCounts[topic] || 0}</span>
               </div>
-              {expandedTopic === topic && (
-                <ul className="topic-todos">
-                  {getTodosByTopic(topic).map((todo) => (
-                    <li
-                      key={todo.id}
-                      className={`topic-todo-item ${selectedTodo?.id === todo.id ? 'selected' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedTodo(todo);
-                      }}
-                    >
-                      {todo.content}
-                    </li>
-                  ))}
-                  {getTodosByTopic(topic).length === 0 && (
-                    <li className="topic-todo-empty">No tasks</li>
-                  )}
-                </ul>
-              )}
             </li>
           ))}
         </ul>
+        {/* Profile Section Left Container */}
+        <div className="profileContainer"                     
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand();
+                    }}>
+            <div className="profileMain">
+                <div className="profileAvatar">
+                    <User size={20} />
+                </div>
+                <div className="profileInfo">
+                     <span className="profileName">{user.signInDetails?.loginId?.split('@')[0] || "Login Required"}</span>
+                     <span className="profileEmail">{user.signInDetails?.loginId || "Login Required"}</span>
+                </div>
+                <button className="settingsButton"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand();
+                    }}
+                    title="Options"
+                >
+                    <Settings size={16} />
+                </button>
+                <button className="logoutButton"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        signOut();
+                    }}
+                    // add clue saying logout when i hover over it
+                    title="Logout"
+                >
+                    <LogOut size={16} />
+                </button>
+            </div>
+            {/* User Xtra Settings */}
+            {isExpanded && (
+                <div className="profileDropdown">
+                    <ul className="profileMenu">
+                        <li onClick={UserDetails}className="profileMenuItem">Preferences</li>
+                        <li className="profileMenuItem" onClick={signOut}>Sign out </li>
+                    </ul>
+                </div>
+            )}
+        </div>
       </div>
-
+      {/* Central Container */}
       <main className="main-content">
         <div className="header">
-          <h1 className="title">{user.signInDetails?.loginId}'s Tasks</h1>
+          <div className="CentralTitle">
+            {/*<Image src={logo} alt="Logo" width={75} height={75} />*/}
+            <h1 className="title">Tasks Mangment</h1>
+          </div>
           <div className="task-creation-panel">
             <div className="input-group">
-              <input
-                type="text"
-                value={newTodo}
-                onChange={(e) => setNewTodo(e.target.value)}
-                placeholder="New task title..."
-                className="input"
-                onKeyPress={(e) => e.key === "Enter" && handelCreateTodo()}
-              />
-              <select
-                className="select"
-                value={selectedTopic}
-                onChange={(e) => setSelectedTopic(e.target.value)}
-              >
+              <input type="text" value={newTodo} onChange={(e) => setNewTodo(e.target.value)}
+                placeholder="New task title..." className="input" onKeyPress={(e) => e.key === "Enter" && handelCreateTodo()} />
+              <select className="select" value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)}>
                 {topics.map(topic => (
                   <option key={topic} value={topic}>{topic}</option>
                 ))}
               </select>
             </div>
-            <textarea
-              value={newTodoDescription}
-              onChange={(e) => setNewTodoDescription(e.target.value)}
-              placeholder="Task description (optional)..."
-              className="textarea"
-              rows={3}
-            />
+            <textarea value={newTodoDescription} onChange={(e) => setNewTodoDescription(e.target.value)}
+            placeholder="Task description (optional)..." className="textarea" rows={3} />
             <div className="button-container">
-              <input
-                type="file"
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-                id="file-upload"
-                // Add key to force input re-render when file is detached
-                key={selectedFile ? "hasFile" : "noFile"}
-              />
+              <input type="file" onChange={handleFileSelect} style={{ display: 'none' }} id="file-upload" key={selectedFile ? "hasFile" : "noFile"} />
               <span className="file-name">
                 {selectedFile && 'File selected: '}
                 {selectedFile ? (
@@ -518,12 +546,6 @@ export default function App() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Edit Task</h3>
-              <button className="modal-close" onClick={closeModals}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6L6 18"></path>
-                  <path d="M6 6l12 12"></path>
-                </svg>
-              </button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -608,6 +630,38 @@ export default function App() {
                 disabled={isAddingTask}
                 onClick={updateTodo}>
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Modal */}
+      {isUserModalOpen && (
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>User Details</h3>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label htmlFor="edit-username">Username</label>
+                <p>{userUsername}</p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-phone">Phone Number</label>
+                <p>{userPhone}</p>
+              </div>
+              <div className="form-group">
+                <label htmlFor="edit-phone">Email</label>
+                <p>{userEmail}</p>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={closeModals}>
+                Back
               </button>
             </div>
           </div>
@@ -712,7 +766,6 @@ export default function App() {
           </div>
         </div>
       )}
-      <button onClick={signOut}>Sign out</button>
     </div>
   );
 }
