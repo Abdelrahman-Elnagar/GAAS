@@ -31,6 +31,7 @@ export default function App() {
   const [newTodo, setNewTodo] = useState("");
   const [newTodoDescription, setNewTodoDescription] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isNewTopicModalOpen, setIsNewTopicModalOpen] = useState(false);
   const [currentTodo, setCurrentTodo] = useState<ExtendedTodo | null>(null);
@@ -46,6 +47,9 @@ export default function App() {
   const { user, signOut } = useAuthenticator();
   const [isDetachFileOpen, setIsDetachFileOpen] = useState(false);
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [userUsername, setUsername] = useState<string>('');
+  const [userPhone, setPhone] = useState<string>('');
+
 
   function listTodos() {
     sharedClient.models.Todo.observeQuery().subscribe({
@@ -215,6 +219,7 @@ export default function App() {
     setIsDeleteModalOpen(false);
     setIsDetachFileOpen(false);
     setIsNewTopicModalOpen(false);
+    setIsUserModalOpen(false);
   };
 
   const detachFile = async () => {
@@ -241,6 +246,14 @@ export default function App() {
     const toggleExpand = () => {
     setIsExpanded(!isExpanded);
     };
+
+  const UserDetails = () => {
+    // get user details
+    const user = {username: "dummy", number:"+1234567890"};  // replace with actual user data
+    setUsername(user.username);
+    setPhone(user.number);
+    setIsUserModalOpen(true);
+  }
 
   return (
     <div className="app-container">
@@ -280,7 +293,11 @@ export default function App() {
           ))}
         </ul>
         {/* Profile Section Left Container */}
-        <div className="profileContainer">
+        <div className="profileContainer"                     
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand();
+                    }}>
             <div className="profileMain">
                 <div className="profileAvatar">
                     <User size={20} />
@@ -294,6 +311,7 @@ export default function App() {
                         e.stopPropagation();
                         toggleExpand();
                     }}
+                    title="Options"
                 >
                     <Settings size={16} />
                 </button>
@@ -302,6 +320,8 @@ export default function App() {
                         e.stopPropagation();
                         signOut();
                     }}
+                    // add clue saying logout when i hover over it
+                    title="Logout"
                 >
                     <LogOut size={16} />
                 </button>
@@ -310,8 +330,7 @@ export default function App() {
             {isExpanded && (
                 <div className="profileDropdown">
                     <ul className="profileMenu">
-                        <li className="profileMenuItem">Profile</li>
-                        <li className="profileMenuItem">Preferences</li>
+                        <li onClick={UserDetails}className="profileMenuItem">Preferences</li>
                         <li className="profileMenuItem" onClick={signOut}>Sign out </li>
                     </ul>
                 </div>
@@ -609,6 +628,34 @@ export default function App() {
                 disabled={isAddingTask}
                 onClick={updateTodo}>
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Modal */}
+      {isUserModalOpen && (
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>User Details</h3>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label htmlFor="edit-username">Username</label>
+                <p>{userUsername}</p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-phone">Phone Number</label>
+                <p>{userPhone}</p>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={closeModals}>
+                Back
               </button>
             </div>
           </div>
