@@ -31,6 +31,7 @@ export default function App() {
   const [newTodo, setNewTodo] = useState("");
   const [newTodoDescription, setNewTodoDescription] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isNewTopicModalOpen, setIsNewTopicModalOpen] = useState(false);
   const [currentTodo, setCurrentTodo] = useState<ExtendedTodo | null>(null);
@@ -46,6 +47,10 @@ export default function App() {
   const { user, signOut } = useAuthenticator();
   const [isDetachFileOpen, setIsDetachFileOpen] = useState(false);
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [userUsername, setUsername] = useState<string>('');
+  const [userPhone, setPhone] = useState<string>('');
+  const [userEmail, setEmail] = useState<string>('');
+
 
   function listTodos() {
     sharedClient.models.Todo.observeQuery().subscribe({
@@ -215,6 +220,7 @@ export default function App() {
     setIsDeleteModalOpen(false);
     setIsDetachFileOpen(false);
     setIsNewTopicModalOpen(false);
+    setIsUserModalOpen(false);
   };
 
   const detachFile = async () => {
@@ -241,6 +247,15 @@ export default function App() {
     const toggleExpand = () => {
     setIsExpanded(!isExpanded);
     };
+
+  const UserDetails = () => {
+    // get user details
+    const user = {username: "dummy", number:"+1234567890", email:"user@example.com"};  // replace with actual user data
+    setUsername(user.username);
+    setPhone(user.number);
+    setEmail(user.email)
+    setIsUserModalOpen(true);
+  }
 
   return (
     <div className="app-container">
@@ -609,6 +624,38 @@ export default function App() {
                 disabled={isAddingTask}
                 onClick={updateTodo}>
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Modal */}
+      {isUserModalOpen && (
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>User Details</h3>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label htmlFor="edit-username">Username</label>
+                <p>{userUsername}</p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-phone">Phone Number</label>
+                <p>{userPhone}</p>
+              </div>
+              <div className="form-group">
+                <label htmlFor="edit-phone">Email</label>
+                <p>{userEmail}</p>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={closeModals}>
+                Back
               </button>
             </div>
           </div>
