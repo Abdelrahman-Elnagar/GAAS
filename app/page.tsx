@@ -14,7 +14,7 @@ import { deletefile, goToFile } from "@/amplify/custom/file/resource";
 import { sharedClient } from "@/amplify/shared/client";
 import { createTodo, deleteTodo, updateTodo } from "@/amplify/custom/todo/resource";
 import Image from 'next/image';
-import logo from './Public/LOGO.jpg';
+import logo from './Public/LOGO.png';
 
 Amplify.configure(outputs);
 const client = generateClient<Schema>();
@@ -321,46 +321,24 @@ export default function App() {
       {/* Central Container */}
       <main className="main-content">
         <div className="header">
-            <div className="CentralTitle">
-                <Image src={logo} alt="Logo" width={75} height={75} />
-                <h1 className="title">Tasks Mangment</h1>
-            </div>
+          <div className="CentralTitle">
+            <Image src={logo} alt="Logo" width={75} height={75} />
+            <h1 className="title">Tasks Mangment</h1>
+          </div>
           <div className="task-creation-panel">
             <div className="input-group">
-              <input
-                type="text"
-                value={newTodo}
-                onChange={(e) => setNewTodo(e.target.value)}
-                placeholder="New task title..."
-                className="input"
-                onKeyPress={(e) => e.key === "Enter" && handelCreateTodo()}
-              />
-              <select
-                className="select"
-                value={selectedTopic}
-                onChange={(e) => setSelectedTopic(e.target.value)}
-              >
+              <input type="text" value={newTodo} onChange={(e) => setNewTodo(e.target.value)}
+                placeholder="New task title..." className="input" onKeyPress={(e) => e.key === "Enter" && handelCreateTodo()} />
+              <select className="select" value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)}>
                 {topics.map(topic => (
                   <option key={topic} value={topic}>{topic}</option>
                 ))}
               </select>
             </div>
-            <textarea
-              value={newTodoDescription}
-              onChange={(e) => setNewTodoDescription(e.target.value)}
-              placeholder="Task description (optional)..."
-              className="textarea"
-              rows={3}
-            />
+            <textarea value={newTodoDescription} onChange={(e) => setNewTodoDescription(e.target.value)}
+            placeholder="Task description (optional)..." className="textarea" rows={3} />
             <div className="button-container">
-              <input
-                type="file"
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-                id="file-upload"
-                // Add key to force input re-render when file is detached
-                key={selectedFile ? "hasFile" : "noFile"}
-              />
+              <input type="file" onChange={handleFileSelect} style={{ display: 'none' }} id="file-upload" key={selectedFile ? "hasFile" : "noFile"} />
               <span className="file-name">
                 {selectedFile && 'File selected: '}
                 {selectedFile ? (
@@ -547,12 +525,6 @@ export default function App() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Edit Task</h3>
-              <button className="modal-close" onClick={closeModals}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6L6 18"></path>
-                  <path d="M6 6l12 12"></path>
-                </svg>
-              </button>
             </div>
             <div className="modal-body">
               <div className="form-group">
