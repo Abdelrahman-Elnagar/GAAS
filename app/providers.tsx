@@ -10,5 +10,9 @@ import outputs from '@/amplify_outputs.json';
 Amplify.configure(outputs);
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return <Authenticator>{children}</Authenticator>;
+   return (
+    <Authenticator signUpAttributes={['preferred_username', 'phone_number']}>
+      {children}
+    </Authenticator>
+  );
 }
