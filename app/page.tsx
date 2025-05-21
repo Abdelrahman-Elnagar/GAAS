@@ -325,7 +325,7 @@ export default function App() {
             {isExpanded && (
                 <div className="profileDropdown">
                     <ul className="profileMenu">
-                        <li className="profileMenuItem" onClick={UserDetails}>Profile</li>
+                        <li onClick={() => window.location.href = "/profile"} className="profileMenuItem">Profile</li>
                         <li className="profileMenuItem" onClick={signOut}>Sign out </li>
                     </ul>
                 </div>
