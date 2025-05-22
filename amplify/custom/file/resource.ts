@@ -2,7 +2,7 @@ import { getUrl, remove, uploadData } from '@aws-amplify/storage';
 
 const options = {
     bucket: {
-        bucketName: 'amplify-d2a1qc3q0pxa7d-de-gaasstoragebucket84ca08f-hw5ds4l9qiuh',
+        bucketName: 'amplify-d1rel1zoj4hes1-de-gaasstoragebucket84ca08f-lar3p940ytdu',
         region: 'eu-north-1'
     }
 };
