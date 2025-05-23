@@ -16,7 +16,7 @@ This is a modern web application built with Next.js and AWS Amplify Gen 2, featu
 - **Backend**: AWS Amplify Gen 2
 - **Authentication**: Amazon Cognito
 - **Storage**: Amazon S3
-- **Database**: Amazon DynamoDB
+- **Database**: Amazon DynamoDB and RDS
 - **Language**: TypeScript
 
 ## 📋 Prerequisites
