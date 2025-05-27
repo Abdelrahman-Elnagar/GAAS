@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { User, Settings, LogOut } from "lucide-react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
 import "./../app/app.css";
@@ -9,9 +10,13 @@ import outputs from "@/amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
 import '@aws-amplify/ui-react/styles.css'
 import { useAuthenticator } from "@aws-amplify/ui-react";
-import { uploadData } from "aws-amplify/storage";
-Amplify.configure(outputs);
+import { deletefile, goToFile } from "@/amplify/custom/file/resource";
+import { sharedClient } from "@/amplify/shared/client";
+import { createTodo, deleteTodo, updateTodo } from "@/amplify/custom/todo/resource";
+import Image from 'next/image';
+import logo from './Public/LOGO.png';
 
+Amplify.configure(outputs);
 const client = generateClient<Schema>();
 
 // Extended type for Todo with topic
@@ -26,10 +31,12 @@ export default function App() {
   const [newTodo, setNewTodo] = useState("");
   const [newTodoDescription, setNewTodoDescription] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isNewTopicModalOpen, setIsNewTopicModalOpen] = useState(false);
   const [currentTodo, setCurrentTodo] = useState<ExtendedTodo | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [editFile, setEditFile] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [selectedTodo, setSelectedTodo] = useState<ExtendedTodo | null>(null);
   const [expandedTopic, setExpandedTopic] = useState<string | null>(null);
@@ -38,8 +45,15 @@ export default function App() {
   const [newTopicName, setNewTopicName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { user, signOut } = useAuthenticator();
+  const [isDetachFileOpen, setIsDetachFileOpen] = useState(false);
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [userUsername, setUsername] = useState<string>('');
+  const [userPhone, setPhone] = useState<string>('');
+  const [userEmail, setEmail] = useState<string>('');
+
+
   function listTodos() {
-    client.models.Todo.observeQuery().subscribe({
+    sharedClient.models.Todo.observeQuery().subscribe({
       next: (data) => {
         // Convert the data to our extended type with topic field
         const extendedData = data.items.map(item => {
@@ -47,15 +61,14 @@ export default function App() {
           // This is a temporary solution until we update the schema
           // In a real app, you'd update your schema to include topic field
           const todoItem = item as ExtendedTodo;
-          if (!todoItem.topic) {
-            todoItem.topic = "Personal"; // Default topic
-          }
-          if (!todoItem.description) {
-            todoItem.description = ""; // Default empty description
-          }
-          if (!todoItem.fileUrl) {
-            todoItem.fileUrl = ""; // Default empty file URL
-          }
+          const content = todoItem.content || "";
+          const parts = content.split("|:|");
+
+          todoItem.content = parts[0] || "",
+            todoItem.topic = parts[1] || "Personal",
+            todoItem.description = parts[2] || "",
+            todoItem.fileUrl = parts[3] || ""
+
           return todoItem;
         });
         setTodos([...extendedData]);
@@ -64,9 +77,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    console.log("Current user:", user);
     if (user) {
-      console.log("Fetching todos for user:", user.username);
       listTodos();
     }
   }, [user]);
@@ -82,54 +93,24 @@ export default function App() {
 
   const topicCounts = getTopicsWithCounts();
 
-  // Create functionality
-  const createTodo = () => {
-    if (newTodo.trim()) {
-      // In a real app, you'd update your schema to include topic
-      // For now, we'll store it in the content field with a special prefix
-      client.models.Todo.create({
-        content: `${newTodo}|:|${selectedTopic}|:|${newTodoDescription}`
-      });
-      setNewTodo("");
-      setNewTodoDescription("");
-    }
-  };
-
-  const handleCreateWithFile = async () => {
+  const handelCreateTodo = async () => {
     if (!newTodo.trim()) {
       alert('Please enter a task title');
       return;
     }
-
+    setIsAddingTask(true);
     try {
-      let fileUrl = '';
-      if (selectedFile) {
-        const result = await uploadData({
-          path: `files/${selectedFile.name}`,
-          data: selectedFile,
-          options: {
-            // Specify a target bucket using name assigned in Amplify Backend
-            bucket: {
-              bucketName:'amplify-d2a1qc3q0pxa7d-de-gaasstoragebucket84ca08f-hw5ds4l9qiuh',
-              region: 'eu-north-1'
-            }
-          }
-        }).result;
-        fileUrl = result.path;
-      }
-
-      // Create todo with file attachment
-      await client.models.Todo.create({
-        content: `${newTodo}|:|${selectedTopic}|:|${newTodoDescription}|:|${fileUrl}`
-      });
-
+      await createTodo(newTodo, selectedTopic, newTodoDescription, selectedFile);
       // Reset form
+      listTodos();
       setNewTodo("");
       setNewTodoDescription("");
       setSelectedFile(null);
     } catch (error) {
       console.error('Error creating task:', error);
       alert('Failed to create task. Please try again.');
+    } finally {
+      setIsAddingTask(false);
     }
   };
 
@@ -140,43 +121,24 @@ export default function App() {
       setSelectedFile(file);
     }
   };
-  // Process content field to extract topic and description
-  const processTodoContent = (todo: Schema["Todo"]["type"]): ExtendedTodo => {
-    const content = todo.content || "";
-    const parts = content.split("|:|");
-
-    return {
-      ...todo,
-      content: parts[0] || "",
-      topic: parts[1] || "Personal",
-      description: parts[2] || "",
-      fileUrl: parts[3] || ""
-    };
-  };
-
-  // Process todos to display with topics
-  const processTodos = () => {
-    return todos.map(processTodoContent);
-  };
-
-  const processedTodos = processTodos();
 
   // Get todos for a specific topic
   const getTodosByTopic = (topic: string) => {
-    return processedTodos.filter(todo => todo.topic === topic);
+    return todos.filter(todo => todo.topic === topic);
   };
 
   // Open edit modal
   const openEditModal = (todo: ExtendedTodo) => {
-    const processedTodo = processTodoContent(todo);
-    setCurrentTodo(processedTodo);
-    setEditContent(processedTodo.content || "");
-    setEditDescription(processedTodo.description || "");
-    setSelectedTopic(processedTodo.topic || "Personal");
+    setCurrentTodo(todo); 
+    setEditContent(todo.content || "");
+    setEditDescription(todo.description || "");
+    setSelectedTopic(todo.topic || "Personal");
+    setEditFile(todo.fileUrl || "")
+    setSelectedFile(null);
     setIsEditModalOpen(true);
   };
-
-  const updateTodo = async () => {
+  
+    const updateTodo = async () => {
   if (currentTodo && editContent.trim()) {
     const updatedContent = `${editContent}|:|${selectedTopic}|:|${editDescription}`;
 
@@ -222,23 +184,12 @@ export default function App() {
   }
 };
 
-
-  // Open delete modal
-  const openDeleteModal = (todo: ExtendedTodo) => {
-    setCurrentTodo(todo);
-    setIsDeleteModalOpen(true);
-  };
-
   // Delete functionality
-  const deleteTodo = () => {
-    if (currentTodo) {
-      client.models.Todo.delete({ id: currentTodo.id });
-
-      // If the deleted todo was selected, clear selection
-      if (selectedTodo && selectedTodo.id === currentTodo.id) {
-        setSelectedTodo(null);
-      }
-
+  const handelDeleteTodo = async () => {
+    if (selectedTodo) {
+      await deleteTodo(selectedTodo.id, selectedTodo.fileUrl);
+      listTodos();
+      setSelectedTodo(null);
       setIsDeleteModalOpen(false);
     }
   };
@@ -250,12 +201,6 @@ export default function App() {
     } else {
       setExpandedTopic(topic);
     }
-  };
-
-  // Select a todo to view details
-  const selectTodo = (todo: ExtendedTodo) => {
-    const processedTodo = processTodoContent(todo);
-    setSelectedTodo(processedTodo);
   };
 
   // Add new topic
@@ -270,16 +215,53 @@ export default function App() {
 
   // Close modals
   const closeModals = () => {
+    setSelectedFile(null);
     setIsEditModalOpen(false);
     setIsDeleteModalOpen(false);
+    setIsDetachFileOpen(false);
     setIsNewTopicModalOpen(false);
+    setIsUserModalOpen(false);
   };
+
+  const detachFile = async () => {
+    try {
+      if (selectedTodo && await deletefile(selectedTodo.fileUrl)) {
+        // @ts-ignore
+        updateTodo(selectedTodo.id, selectedTodo.content, selectedTodo.topic, selectedTodo.description, "", null);
+        setSelectedTodo({
+          ...selectedTodo,
+          fileUrl: ""
+        });
+        listTodos();
+        setEditFile("")
+        closeModals();
+      }
+    } catch (error) {
+      console.error(error)
+    }
+    setIsDetachFileOpen(false);
+  }
+
+    // Popup System For Profile
+    const [isExpanded, setIsExpanded] = useState(false);
+    const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+    };
+
+  const UserDetails = () => {
+    // get user details
+    const user = {username: "dummy", number:"+1234567890", email:"user@example.com"};  // replace with actual user data
+    setUsername(user.username);
+    setPhone(user.number);
+    setEmail(user.email)
+    setIsUserModalOpen(true);
+  }
 
   return (
     <div className="app-container">
       <div className="sidebar">
         <div className="sidebar-header">
-          <h2>Topics</h2>
+          <h2>Categories</h2>
           <button
             className="btn-icon-small"
             onClick={() => setIsNewTopicModalOpen(true)}
@@ -309,67 +291,68 @@ export default function App() {
                 <span className="topic-name">{topic}</span>
                 <span className="topic-count">{topicCounts[topic] || 0}</span>
               </div>
-              {expandedTopic === topic && (
-                <ul className="topic-todos">
-                  {getTodosByTopic(topic).map((todo) => (
-                    <li
-                      key={todo.id}
-                      className={`topic-todo-item ${selectedTodo?.id === todo.id ? 'selected' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        selectTodo(todo);
-                      }}
-                    >
-                      {todo.content}
-                    </li>
-                  ))}
-                  {getTodosByTopic(topic).length === 0 && (
-                    <li className="topic-todo-empty">No tasks</li>
-                  )}
-                </ul>
-              )}
             </li>
           ))}
         </ul>
+        {/* Profile Section Left Container */}
+        <div className="profileContainer">
+            <div className="profileMain">
+                <div className="profileAvatar">
+                    <User size={20} />
+                </div>
+                <div className="profileInfo">
+                     <span className="profileName">{user.signInDetails?.loginId?.split('@')[0] || "Login Required"}</span>
+                     <span className="profileEmail">{user.signInDetails?.loginId || "Login Required"}</span>
+                </div>
+                <button className="settingsButton"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand();
+                    }}
+                >
+                    <Settings size={16} />
+                </button>
+                <button className="logoutButton"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        signOut();
+                    }}
+                >
+                    <LogOut size={16} />
+                </button>
+            </div>
+            {/* User Xtra Settings */}
+            {isExpanded && (
+                <div className="profileDropdown">
+                    <ul className="profileMenu">
+                        <li onClick={() => window.location.href = "/profile"} className="profileMenuItem">Profile</li>
+                        <li className="profileMenuItem" onClick={signOut}>Sign out </li>
+                    </ul>
+                </div>
+            )}
+        </div>
       </div>
-
+      {/* Central Container */}
       <main className="main-content">
         <div className="header">
-          <h1 className="title">{user.signInDetails?.loginId}'s Tasks</h1>
+          <div className="CentralTitle">
+            <Image src={logo} alt="Logo" width={75} height={75} />
+            <h1 className="title">Tasks Mangment</h1>
+          </div>
           <div className="task-creation-panel">
             <div className="input-group">
-              <input
-                type="text"
-                value={newTodo}
-                onChange={(e) => setNewTodo(e.target.value)}
-                placeholder="New task title..."
-                className="input"
-                onKeyPress={(e) => e.key === "Enter" && handleCreateWithFile()}
-              />
-              <select
-                className="select"
-                value={selectedTopic}
-                onChange={(e) => setSelectedTopic(e.target.value)}
-              >
+              <input type="text" value={newTodo} onChange={(e) => setNewTodo(e.target.value)}
+                placeholder="New task title..." className="input" onKeyPress={(e) => e.key === "Enter" && handelCreateTodo()} />
+              <select className="select" value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)}>
                 {topics.map(topic => (
                   <option key={topic} value={topic}>{topic}</option>
                 ))}
               </select>
             </div>
-            <textarea
-              value={newTodoDescription}
-              onChange={(e) => setNewTodoDescription(e.target.value)}
-              placeholder="Task description (optional)..."
-              className="textarea"
-              rows={3}
-            />
+            <textarea value={newTodoDescription} onChange={(e) => setNewTodoDescription(e.target.value)}
+            placeholder="Task description (optional)..." className="textarea" rows={3} />
             <div className="button-container">
-              <input
-                type="file"
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-                id="file-upload"
-              />
+              <input type="file" onChange={handleFileSelect} style={{ display: 'none' }} id="file-upload" key={selectedFile ? "hasFile" : "noFile"} />
               <span className="file-name">
                 {selectedFile && 'File selected: '}
                 {selectedFile ? (
@@ -385,14 +368,22 @@ export default function App() {
                   'No file selected'
                 )}
               </span>
-              <label htmlFor="file-upload" className="btn-primary" onClick={selectedFile ? (e) => {
-                e.preventDefault();
-                setSelectedFile(null);
-              } : undefined}>
+              <label
+                htmlFor="file-upload"
+                className="btn-primary"
+                onClick={selectedFile ? (e) => {
+                  e.preventDefault();
+                  setSelectedFile(null);
+                } : undefined}
+              >
                 {selectedFile ? 'Detach File' : 'Attach File'}
               </label>
-              <button onClick={handleCreateWithFile} className="btn-primary">
-                Add Task
+              <button
+                onClick={handelCreateTodo}
+                className={`btn-primary ${isAddingTask ? 'loading' : ''}`}
+                disabled={isAddingTask}
+              >
+                {isAddingTask ? 'Adding...' : 'Add Task'}
               </button>
             </div>
           </div>
@@ -411,13 +402,26 @@ export default function App() {
                   <li
                     key={todo.id}
                     className={`todo-item ${selectedTodo?.id === todo.id ? 'selected' : ''}`}
-                    onClick={() => selectTodo(todo)}
+                    onClick={() => setSelectedTodo(todo)}
                   >
                     <span className="todo-content">{todo.content}</span>
                     <div className="todo-actions">
+                      {todo.fileUrl && (
+                        <button onClick={() => goToFile(todo.fileUrl)}
+                          className="btn-icon"
+                          aria-label="Download file"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                          </svg>
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setSelectedTodo(todo);
                           openEditModal(todo);
                         }}
                         className="btn-icon"
@@ -430,7 +434,8 @@ export default function App() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openDeleteModal(todo);
+                          setSelectedTodo(todo)
+                          setIsDeleteModalOpen(true);
                         }}
                         className="btn-icon-destructive"
                         aria-label="Delete todo"
@@ -486,6 +491,18 @@ export default function App() {
                   <p className="empty-description">No description provided</p>
                 )}
               </div>
+              <div className="details-description">
+                <h4>Attached File</h4>
+                {selectedTodo.fileUrl ? (
+                  <a
+                    onClick={() => goToFile(selectedTodo.fileUrl)}
+                    rel="noopener noreferrer"
+                    className="file-link"
+                  >{selectedTodo.fileUrl.substring(6)}</a>
+                ) : (
+                  <p className="empty-description">No Attached File</p>
+                )}
+              </div>
               <div className="details-actions">
                 <button
                   className="btn-secondary"
@@ -495,7 +512,7 @@ export default function App() {
                 </button>
                 <button
                   className="btn-destructive"
-                  onClick={() => openDeleteModal(selectedTodo)}
+                  onClick={() => setIsDeleteModalOpen(true)}
                 >
                   Delete Task
                 </button>
@@ -522,12 +539,6 @@ export default function App() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Edit Task</h3>
-              <button className="modal-close" onClick={closeModals}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6L6 18"></path>
-                  <path d="M6 6l12 12"></path>
-                </svg>
-              </button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -555,6 +566,45 @@ export default function App() {
                 </select>
               </div>
               <div className="form-group">
+                <label htmlFor="edit-file">File</label>
+                {editFile === "" ? (
+                  <div className="file-input-wrapper">
+                    <input
+                      type="file"
+                      onChange={handleFileSelect}
+                      style={{ display: 'none' }}
+                      id="file-upload"
+                    />
+
+                    <label htmlFor="file-upload" className="file_upload" onClick={selectedFile ? (e) => {
+                      e.preventDefault();
+                      setSelectedFile(null);
+                    } : undefined}>
+                      {selectedFile ? 'Detach File' : 'Attach File'}
+                    </label>
+                    <span className="file-name">
+                      {selectedFile && 'File selected: '}
+                      {selectedFile ? (
+                        <a
+                          href={URL.createObjectURL(selectedFile) || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="file-link"
+                        >
+                          {selectedFile.name}
+                        </a>
+                      ) : (
+                        'No file selected'
+                      )}
+                    </span>
+                  </div>
+                ) : (
+                  <button onClick={() => setIsDetachFileOpen(true)} className="file_upload">
+                    Detach Uploaded File
+                  </button>
+                )}
+              </div>
+              <div className="form-group">
                 <label htmlFor="edit-description">Description</label>
                 <textarea
                   id="edit-description"
@@ -569,8 +619,42 @@ export default function App() {
               <button className="btn-secondary" onClick={closeModals}>
                 Cancel
               </button>
-              <button className="btn-primary" onClick={updateTodo}>
+              <button className={`btn-primary ${isAddingTask ? 'loading' : ''}`}
+                disabled={isAddingTask}
+                onClick={updateTodo}>
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Modal */}
+      {isUserModalOpen && (
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>User Details</h3>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label htmlFor="edit-username">Username</label>
+                <p>{userUsername}</p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-phone">Phone Number</label>
+                <p>{userPhone}</p>
+              </div>
+              <div className="form-group">
+                <label htmlFor="edit-phone">Email</label>
+                <p>{userEmail}</p>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={closeModals}>
+                Back
               </button>
             </div>
           </div>
@@ -593,15 +677,44 @@ export default function App() {
             <div className="modal-body">
               <p>Are you sure you want to delete this task?</p>
               <div className="todo-preview">
-                {currentTodo?.content}
+                {selectedTodo?.content}
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={closeModals}>
                 Cancel
               </button>
-              <button className="btn-destructive" onClick={deleteTodo}>
+              <button className="btn-destructive" onClick={handelDeleteTodo}>
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* detach file */}
+      {isDetachFileOpen && (
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Detach file</h3>
+              <button className="modal-close" onClick={closeModals}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6L6 18"></path>
+                  <path d="M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to detach this file from the task?</p>
+              <p style={{ color: "red" }}>It will be lost forever</p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={closeModals}>
+                Cancel
+              </button>
+              <button className="btn-destructive" onClick={detachFile}>
+                Detach
               </button>
             </div>
           </div>
@@ -646,7 +759,6 @@ export default function App() {
           </div>
         </div>
       )}
-      <button onClick={signOut}>Sign out</button>
     </div>
   );
 }
